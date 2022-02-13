@@ -1,3 +1,7 @@
+# An SQL-code for a shipping company Lorenzo (fictional). Created a database, made some cleaning and transformating, conducted small analysis with sql. 
+# Also made a dashboard with Tableau https://public.tableau.com/app/profile/al.chernyshev/viz/LorenzoShippingDashboard/Dashboard1
+
+
 # 1. Database and tables creation, loading data.
   
         drop schema if exists lorenzo;
