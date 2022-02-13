@@ -1,3 +1,6 @@
+# An SQL-code for well-known Superstore dataset. Created a database, made some cleaning, add some code for basic analysis. 
+# Also made a Dashboard with Power BI (for some reason map doesn't work).
+
 # 1.Creating database, table and filling it with data from csv file
 	commit;
 
