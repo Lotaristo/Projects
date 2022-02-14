@@ -1,0 +1,128 @@
+# link to the app https://california-births.herokuapp.com
+
+# libraries
+import pandas as pd
+import json
+from urllib.request import urlopen
+
+import plotly.express as px
+import dash
+from dash import dcc
+from dash import html
+from dash.dependencies import Input, Output
+import dash_bootstrap_components as dbc
+
+
+
+
+
+df = pd.read_csv('inhospitalbirthsbyagegroup.csv')
+
+df = df.rename(columns={'patcnty':"county", 'agegrp':'age_group'})
+
+url = 'https://raw.githubusercontent.com/Lotaristo/Datasets/main/county_ca.geojson'
+with urlopen(url) as response:
+    counties = json.load(response)
+
+counties_map = {}  # dict for storing acquired data
+
+for feature in counties['features']:
+    for props in feature:  # using double cycle because there are two levels
+        counties_map[feature['properties']['NAME']] = feature['id']  # fit data to dict
+
+df['id'] = df.county.apply(lambda x: counties_map[x])
+
+
+
+
+# layout for app:
+#__title
+#__line_graph__, __bar_graph__
+#__map_plot__
+
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY],
+                meta_tags=[{'name': 'viewport',
+                            'content': 'width=device-width, initial-scale=1.0'}]
+                )
+server = app.server
+
+app.layout = dbc.Container([
+    dbc.Row([
+        dbc.Col(
+            html.H1("Number of In-Hospital Births by Mother's Age Group", className = 'text-center text-primary')
+
+        )
+    ]),
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id='plot_a', figure={})
+        ], xs=12, sm=12, md=12, lg=5, xl=5),
+        dbc.Col([
+            dcc.Graph(id='plot_b', figure={})
+        ], xs=12, sm=12, md=12, lg=7, xl=7),
+    ]),
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id='map', figure={}),
+            html.Div(id='none')
+        ], width = 12)
+    ]),
+])
+
+@app.callback(
+    Output('plot_a', 'figure'),
+    Output('plot_b', 'figure'),
+    Output('map', 'figure'),
+    Input('none', 'children')
+)
+def update(none):
+    fig1 = (px.line(df.groupby('year').sum(),
+            range_y=[900000, 1200000],
+            title='Total Number of Babies Born from 2008 to 2016',
+            hover_data={'variable': False},
+            height = 400
+            ))
+    fig1.update_layout(showlegend=False)
+
+    df_age = df.groupby('age_group').sum()['count'].sort_values()
+    fig2 = (px.bar(df_age,
+           orientation='h',
+           title='Distribution between Different Categories of Mothers',
+           text=round(df_age / df_age[3] * 100, 2).astype(str) + ' %',  # add percents,
+           hover_data={'variable': False},
+           height=400
+                   ))
+
+    fig3 = (px.choropleth(
+        df,
+        geojson=counties,
+        locations="id",
+        color="count",
+        hover_name="county",
+        hover_data={'id': False},  # removes id
+        facet_col="age_group",  # 2 facets by age
+        facet_col_wrap=2,
+        animation_frame="year",
+        color_continuous_scale=[[0, 'rgb(240,240,240)'], # sets different color scales
+                      [0.1, 'rgb(14,66,136)'],
+                      [0.1, 'rgb(221,250,227)'],
+                      [0.2, 'rgb(4,145,32)'],
+                      [0.2, 'rgb(240,214,214)'],
+                      [1, 'rgb(192,6,19)']
+                     ],
+        labels={'count': 'Number of Births', 'age_group': 'Age Group'},  # change the label
+        height = 600
+    ))
+    fig3.update_geos(fitbounds="locations")  # centers on location
+    fig3.for_each_annotation(
+        lambda a: a.update(text=a.text.replace("Age Group=", "")))  # removes 'age group' for each facet
+    fig3.update_layout(title=  # align title to the center + adding title
+                      {'text': "Distribution of Births by Counties by Years",
+                       'y': 0.95, 'x': 0.5,
+                       'xanchor': 'center', 'yanchor': 'middle'})
+
+    return fig1, fig2, fig3
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True) # Use "False" if you run in Jupyter.
